@@ -127,7 +127,6 @@ def cell_calcs(lat, lon, kdp_proc, zdr_proc, zhh_proc,
 
 
 def marcus_stats(scan_group):
-    print(scan_group)
     file_name = scan_group['file'].iloc[0]
     grid = pyart.io.read_grid(file_name)
     grid_ll = grid.get_point_longitude_latitude()  # revise this
@@ -157,6 +156,7 @@ def marcus_stats(scan_group):
 
     output = scan_group.apply(get_cell_calcs, axis=1)
     marcus_frame = pd.DataFrame(output)
+    print(marcus_frame)
 
     del grid, rho, zhh, kdp, zdr, kdp_proc, zdr_proc, zhh_proc, kdp_int
     del kdp_pei, zdr_pei, zhh_pei
@@ -173,7 +173,9 @@ def attach_marcus_stats(tracks_frame):
     return tracks_frame.join(stats)
 
 
-#def get_gpars():
+#def get_gpars(grid):
+#    grid_size = get_grid_size(grid)
+
 
 #%%
 if __name__ =='__main__':
@@ -182,7 +184,6 @@ if __name__ =='__main__':
     test_tracks_path = '/home/mhpicel/NASA/july2015/refl_long_storm.csv'
     test_tracks = pd.read_csv(test_tracks_path)
     test_tracks.set_index(['scan', 'uid'], inplace=True)
-#    test_tracks.set_index('scan')
     test_tracks = test_tracks.loc[:10]
     test_tracks['time'] = test_tracks['time'].apply(parse_date_string)
 
