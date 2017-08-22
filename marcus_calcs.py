@@ -37,9 +37,9 @@ def parse_date_string(date_string):
 
 def filename_from_dt(dt, base):
     date = dt.strftime('%Y%m%d')
-    file = '/KHGX_grid_' + dt.strftime('%Y%m%d.%H%M%S')
+    file_name = '/KHGX_grid_' + dt.strftime('%Y%m%d.%H%M%S')
     ext = '.nc'
-    return base + date + file + ext
+    return base + date + file_name + ext
 
 
 def latlon_from_xy(xd,yd,lat_c,lon_c):
@@ -187,8 +187,8 @@ if __name__ =='__main__':
     test_tracks = test_tracks.loc[:10]
     test_tracks['time'] = test_tracks['time'].apply(parse_date_string)
 
-    def get_filenames(file):
-        return filename_from_dt(file, grid_dir)
+    def get_filenames(dt):
+        return filename_from_dt(dt, grid_dir)
     test_tracks['file'] = test_tracks['time'].apply(get_filenames)
 
     out_tracks = attach_marcus_stats(test_tracks)
