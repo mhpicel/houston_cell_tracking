@@ -191,4 +191,6 @@ if __name__ =='__main__':
         return filename_from_dt(dt, grid_dir)
     test_tracks['file'] = test_tracks['time'].apply(get_filenames)
 
+    start = datetime.now()
     out_tracks = attach_marcus_stats(test_tracks)
+    print(datetime.now()-start)
