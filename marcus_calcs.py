@@ -2,7 +2,6 @@ import pandas as pd
 from dask import dataframe as dd
 import numpy as np
 import pyart
-import pyproj
 from datetime import datetime
 
 
