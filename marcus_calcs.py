@@ -7,7 +7,7 @@ from datetime import datetime
 
 # Global Parameters
 FILL_VALUE = -9999.
-ZMELT = 5
+ZMELT = 8
 NLAYERS = 3
 RADIUS = 5000
 PCTILE = 98.
