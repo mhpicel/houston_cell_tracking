@@ -5,29 +5,15 @@ import pyart
 import pyproj
 from datetime import datetime
 
-# Global Parameters
-FILL_VALUE = -9999.
-ZMELT = 5
-NLAYERS = 3
-RADIUS = 5000
-PCTILE = 98.
-USE_KDP_THRESH = False
-RHO_THRESH = 0.8
-DBZ_THRESH = 15.
+
+def get_grid_size(grid_obj):
+    z_size = grid_obj.z['data'][1] - grid_obj.z['data'][0]
+    y_size = grid_obj.y['data'][1] - grid_obj.y['data'][0]
+    x_size = grid_obj.x['data'][1] - grid_obj.x['data'][0]
+    return np.array([z_size, y_size, x_size])
 
 
-#def get_grid_size(grid_obj):
-#    """calculates grid size per dimension given a grid object."""
-#    z_len = grid_obj.z['data'][-1] - grid_obj.z['data'][0]
-#    x_len = grid_obj.x['data'][-1] - grid_obj.x['data'][0]
-#    y_len = grid_obj.y['data'][-1] - grid_obj.y['data'][0]
-#    z_size = z_len / (grid_obj.z['data'].shape[0] - 1)
-#    x_size = x_len / (grid_obj.x['data'].shape[0] - 1)
-#    y_size = y_len / (grid_obj.y['data'].shape[0] - 1)
-#    return np.array([z_size, y_size, x_size])
-
-
-def get_grid_alt(grid_size, alt_meters):
+def get_grid_z(grid_size, alt_meters):
     return np.int(np.round(alt_meters/grid_size[0]))
 
 
@@ -40,22 +26,6 @@ def filename_from_dt(dt, base):
     file_name = '/KHGX_grid_' + dt.strftime('%Y%m%d.%H%M%S')
     ext = '.nc'
     return base + date + file_name + ext
-
-
-def latlon_from_xy(xd,yd,lat_c,lon_c):
-    #..Make a grids latgrid(x,y) and longrid(x,y) from x and y displacements
-    g = pyproj.Geod(ellps='clrk66')
-    #..Uses pyproj geod
-    lat = np.empty([len(yd), len(xd)])
-    lon = np.empty([len(yd), len(xd)])
-    #..cacalate azimuth between radar and point
-    for j in range(len(yd)):
-        for i in range(len(xd)):
-            faz = np.arctan2(xd[i], yd[j])
-            dist = np.hypot(xd[i], yd[j])
-            lon[j, i], lat[j, i], baz = g.fwd(lon_c, lat_c,
-                                              180.*faz/np.pi,dist)
-    return lat, lon
 
 
 def haversine(lat1, lon1, lat2, lon2):
@@ -72,19 +42,21 @@ def haversine(lat1, lon1, lat2, lon2):
     return R * c
 
 #%%
-def preprocess_data(data, rho=None, zhh=None):
-    data = np.ma.masked_values(data, FILL_VALUE)
+def preprocess_data(data, pars, rho=None, zhh=None):
+    data = np.ma.masked_values(data, pars['fill_value'])
     if rho is not None:
-        data = np.ma.masked_where(rho < RHO_THRESH, data)
-        data = np.ma.masked_where(zhh < DBZ_THRESH, data)
+        data = np.ma.masked_where(rho < pars['rho_thresh'], data)
+        data = np.ma.masked_where(zhh < pars['dbz_thresh'], data)
     return data
 
 
-def get_neighborhood(dist_from_cent, kdp_proc, kdp_int, kdp_thresh=False):
-    circle = dist_from_cent < RADIUS
+def get_neighborhood(dist_from_cent,
+                     kdp_proc, kdp_int, pars, kdp_thresh=False):
+
+    circle = dist_from_cent < pars['radius']
     circle = np.tile(circle, (kdp_proc.shape[0], 1, 1))
     layers = np.zeros_like(kdp_proc.data)
-    layers[ZMELT:ZMELT+NLAYERS+1, :, :] = 1
+    layers[pars['zmelt']:pars['zmelt']+pars['nlayers']+1, :, :] = 1
     neighborhood = np.logical_and(circle, layers.astype('bool'))
 
     if kdp_thresh:
@@ -96,15 +68,17 @@ def get_neighborhood(dist_from_cent, kdp_proc, kdp_int, kdp_thresh=False):
 
 
 def cell_calcs(lat, lon, kdp_proc, zdr_proc, zhh_proc,
-               kdp_pei, zdr_pei, zhh_pei, kdp_int, grid_ll):
+               kdp_pei, zdr_pei, zhh_pei, kdp_int, pars):
 
+    grid_ll = pars['grid_ll']
     dist_from_cent = haversine(lat, lon, grid_ll[1], grid_ll[0])
-    neighborhood = get_neighborhood(dist_from_cent, kdp_proc, kdp_int)
-    kdp_pct = np.percentile(kdp_proc[neighborhood], PCTILE)
-    zdr_pct = np.percentile(zdr_proc[neighborhood], PCTILE)
-    zhh_pct = np.percentile(zhh_proc[neighborhood], PCTILE)
 
-    if USE_KDP_THRESH:
+    neighborhood = get_neighborhood(dist_from_cent, kdp_proc, kdp_int, pars)
+    kdp_pct = np.percentile(kdp_proc[neighborhood], pars['pctile'])
+    zdr_pct = np.percentile(zdr_proc[neighborhood], pars['pctile'])
+    zhh_pct = np.percentile(zhh_proc[neighborhood], pars['pctile'])
+
+    if pars['use_kdp_thresh']:
         neighborhood = get_neighborhood(dist_from_cent, kdp_proc,
                                         kdp_int, kdp_thresh=True)
 
@@ -126,21 +100,23 @@ def cell_calcs(lat, lon, kdp_proc, zdr_proc, zhh_proc,
                       'zhh_pet': zhh_pet})
 
 
-def marcus_stats(scan_group):
+def marcus_stats(scan_group, pars):
     file_name = scan_group['file'].iloc[0]
     grid = pyart.io.read_grid(file_name)
-    grid_ll = grid.get_point_longitude_latitude()  # revise this
 
     rho = grid.fields['cross_correlation_ratio']['data']
     zhh = grid.fields['reflectivity']['data']
     kdp = grid.fields['specific_differential_phase']['data']
     zdr = grid.fields['differential_reflectivity']['data']
 
-    kdp_proc = preprocess_data(kdp, rho=rho, zhh=zhh)
-    zdr_proc = preprocess_data(zdr, rho=rho, zhh=zhh)
-    zhh_proc = preprocess_data(zhh)
+    kdp_proc = preprocess_data(kdp, pars, rho=rho, zhh=zhh)
+    zdr_proc = preprocess_data(zdr, pars, rho=rho, zhh=zhh)
+    zhh_proc = preprocess_data(zhh, pars)
 
-    kdp_int = np.sum(kdp_proc[ZMELT:NLAYERS+1, :, :], axis=0)
+    kdp_int = np.sum(
+        kdp_proc[pars['zmelt']:pars['zmelt']+pars['nlayers']+1, :, :],
+        axis=0
+    )
 
     z_column = grid.z['data'][:, np.newaxis, np.newaxis]
     kdp_pei = kdp_proc*z_column
@@ -152,7 +128,7 @@ def marcus_stats(scan_group):
         return cell_calcs(cell_row['lat'], cell_row['lon'],
                           kdp_proc, zdr_proc, zhh_proc,
                           kdp_pei, zdr_pei, zhh_pei,
-                          kdp_int, grid_ll)
+                          kdp_int, pars)
 
     output = scan_group.apply(get_cell_calcs, axis=1)
     marcus_frame = pd.DataFrame(output)
@@ -163,18 +139,35 @@ def marcus_stats(scan_group):
     return marcus_frame
 
 
-def attach_marcus_stats(tracks_frame):
+def attach_marcus_stats(tracks_frame, zmelt_meters=4000, layer_size=1500,
+                        radius=5000, pctile=98., use_kdp_thresh=False,
+                        rho_thresh=0.8, dbz_thresh=15, fill_value=-9999.):
     # setup
-#    file_name = tracks_frame['file'].iloc[0]
-#    grid = pyart.io.read_grid(file_name)
-#    gpars = get_gpars(grid)
+    file_name = tracks_frame['file'].iloc[0]
+    grid = pyart.io.read_grid(file_name)
+    zmelt, nlayers, grid_ll = get_gpars(grid, zmelt_meters, layer_size)
 
-    stats = tracks_frame.groupby(level='scan').apply(marcus_stats)
+    pars = {'zmelt': zmelt,
+            'nlayers': nlayers,
+            'grid_ll': grid_ll,
+            'radius': radius,
+            'pctile': pctile,
+            'use_kdp_thresh': use_kdp_thresh,
+            'rho_thresh': rho_thresh,
+            'dbz_thresh': dbz_thresh,
+            'fill_value': fill_value}
+
+    stats = tracks_frame.groupby(level='scan').apply(lambda scan:
+                                                     marcus_stats(scan, pars))
     return tracks_frame.join(stats)
 
 
-#def get_gpars(grid):
-#    grid_size = get_grid_size(grid)
+def get_gpars(grid, zmelt_meters, layer_size):
+    grid_size = get_grid_size(grid)
+    zmelt = get_grid_z(grid_size, zmelt_meters)
+    nlayers = get_grid_z(grid_size, layer_size)
+    grid_ll = grid.get_point_longitude_latitude()
+    return zmelt, nlayers, grid_ll
 
 
 #%%
@@ -191,4 +184,6 @@ if __name__ =='__main__':
         return filename_from_dt(dt, grid_dir)
     test_tracks['file'] = test_tracks['time'].apply(get_filenames)
 
+    start = datetime.now()
     out_tracks = attach_marcus_stats(test_tracks)
+    print(datetime.now()-start)
