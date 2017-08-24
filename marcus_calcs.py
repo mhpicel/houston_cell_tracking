@@ -41,6 +41,22 @@ def haversine(lat1, lon1, lat2, lon2):
     return R * c
 
 #%%
+def check_keys(grid, scan_group):
+    keys = set(['cross_correlation_ratio', 'reflectivity',
+                'specific_differential_phase', 'differential_reflectivity'])
+    if keys <= set(grid.fields.keys()):
+        return False, None
+    else:
+        nan_row = pd.Series({'kdp_pct': np.nan,
+                             'zdr_pct': np.nan,
+                             'zhh_pct': np.nan,
+                             'kdp_pet': np.nan,
+                             'zdr_pet': np.nan,
+                             'zhh_pet': np.nan})
+        nan_output = scan_group.apply(lambda row: nan_row, axis=1)
+        return True, pd.DataFrame(nan_output)
+
+
 def preprocess_data(data, pars, rho=None, zhh=None):
     data = np.ma.masked_values(data, pars['fill_value'])
     if rho is not None:
@@ -103,6 +119,10 @@ def marcus_stats(scan_group, pars):
     file_name = scan_group['file'].iloc[0]
     grid = pyart.io.read_grid(file_name)
 
+    bad_keys, nan_frame = check_keys(grid, scan_group)
+    if bad_keys:
+        return nan_frame
+
     rho = grid.fields['cross_correlation_ratio']['data']
     zhh = grid.fields['reflectivity']['data']
     kdp = grid.fields['specific_differential_phase']['data']
@@ -134,7 +154,7 @@ def marcus_stats(scan_group, pars):
     print(marcus_frame)
 
     del grid, rho, zhh, kdp, zdr, kdp_proc, zdr_proc, zhh_proc, kdp_int
-    del kdp_pei, zdr_pei, zhh_pei
+    del kdp_pei, zdr_pei, zhh_pei, nan_frame
     return marcus_frame
 
 
