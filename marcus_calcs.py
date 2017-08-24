@@ -77,7 +77,7 @@ def get_neighborhood(dist_from_cent,
     if kdp_thresh:
         kdp_95 = np.percentile(kdp_proc[neighborhood], 95.)
         filtered_circle = np.logical_and(circle, kdp_int > kdp_95)
-        neighborhood = np.locical_and(filtered_circle, layers.astype('bool'))
+        neighborhood = np.logical_and(filtered_circle, layers.astype('bool'))
 
     return neighborhood
 
