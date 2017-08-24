@@ -57,7 +57,7 @@ if __name__ == '__main__':
 
 #    storm_tracks = compute(*storm_graph, get=dask.multiprocessing.get)
 
-    storm_bag = db.from_sequenc(storm_iters, npartitions=36)
+    storm_bag = db.from_sequence(storm_iters, npartitions=36)
     storm_bag = storm_bag.map(lambda s_iter:
                               tracks_from_iter(s_iter[0], s_iter[1]))
 
