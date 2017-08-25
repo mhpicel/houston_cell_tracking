@@ -42,8 +42,8 @@ if __name__ == '__main__':
     client = Client('')
     out_tracks = compute(*track_graph, get=client.get)
 
-    for number, track in out_tracks:
-        track.tracks.to_csv(out_dir + 'stormcalcs_' + number + '.csv')
+    for number, tracks in out_tracks:
+        tracks.to_csv(out_dir + 'stormcalcs_' + number + '.csv')
 
     time_elapsed = datetime.now() - start
     print('nfiles: ', len(files))
