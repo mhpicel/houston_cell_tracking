@@ -1,7 +1,8 @@
 import pandas as pd
 #import dask.bag as db
-import dask
 import datetime.datetime
+import dask
+from dask.distributed import Client
 from dask import delayed, compute
 from find_storms import get_file_tree, parse_date_string
 from marcus_calcs import attach_marcus_stats, filename_from_dt
@@ -38,7 +39,8 @@ if __name__ == '__main__':
 
     track_graph = [delayed(prep_storm_attach_stats)(file, grid_dir)
                    for file in files.sort()]
-    out_tracks = compute(*track_graph, get=dask.multiprocessing.get)
+    client = Client('')
+    out_tracks = compute(*track_graph, get=client.get)
 
     for number, track in out_tracks:
         track.tracks.to_csv(out_dir + 'stormcalcs_' + number + '.csv')
