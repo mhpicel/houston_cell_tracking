@@ -2,6 +2,7 @@ import pandas as pd
 from dask import dataframe as dd
 import numpy as np
 import pyart
+import gc
 from datetime import datetime
 
 
@@ -155,6 +156,7 @@ def marcus_stats(scan_group, pars):
 
     del grid, rho, zhh, kdp, zdr, kdp_proc, zdr_proc, zhh_proc, kdp_int
     del kdp_pei, zdr_pei, zhh_pei, nan_frame
+    gc.collect()
     return marcus_frame
 
 
