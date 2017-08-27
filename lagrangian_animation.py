@@ -1,6 +1,7 @@
 from matplotlib import pyplot as plt
 from tracking.core import cell_tracking as ct
 from datetime import datetime
+from find_storms import parse_date_string
 import pandas as pd
 import numpy as np
 import pyart
@@ -20,7 +21,8 @@ tracks.set_index(['storm_id', 'uid'], inplace=True)
 cells = tracks.groupby(level=['storm_id', 'uid'])
 tracks['life_iso'] = cells.apply(lambda x: np.all(x['isolated']))
 tracks['nscans'] = cells.size()
-ideal_cell = tracks.loc[tracks[tracks.life_iso]['nscans'].argmax()]
+ideal_cell = tracks.loc[tracks[tracks.life_iso]['nscans'].argmax()].copy()
+ideal_cell['time'] = ideal_cell['time'].apply(parse_date_string)
 config_grid = pyart.io.read_grid(ideal_cell['file'].iloc[0])
 grid_size = ct.get_grid_size(config_grid)
 
