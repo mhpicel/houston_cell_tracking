@@ -13,10 +13,34 @@ def parse_date_string(date_string):
     return datetime.datetime.strptime(date_string, '%Y-%m-%d %H:%M:%S')
 
 
+def unparse_datetime(dt, base):
+    date = dt.strftime('%Y%m%d')
+    file = '/KHGX_grid_' + dt.strftime('%Y%m%d.%H%M%S')
+    ext = '.nc'
+    return base + date + file + ext
+
+
 def tracks_from_iter(s_name, s_iter):
     tobj = ct.Cell_tracks()
     tobj.get_tracks(s_iter)
     return s_name, tobj
+
+
+class Grid_iter:
+    def __init__(self, dts, dir_base):
+        self.filenames = [unparse_datetime(dt, dir_base) for dt in dts]
+        self.i = -1
+        self.n = len(self.filenames)
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if self.i < self.n - 1:
+            self.i += 1
+            return pyart.io.read_grid(self.filenames[self.i])
+        else:
+            raise StopIteration
 
 
 if __name__ == '__main__':
